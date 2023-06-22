@@ -68,7 +68,61 @@ pub fn capture_window_into_bgr_buffer(
     hwnd: isize,
     buffer: &mut Vec<u8>,
 ) -> Result<WindowSize, windows::core::Error> {
-    capture_window_into_bgr_buffer_ex(hwnd, buffer, Using::PrintWindow, Area::Full, None, None)
+    buffer.clear();
+    let hwnd = HWND(hwnd);
+
+    unsafe {
+        SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)?;
+
+        let hdc_screen = Hdc::get_dc(hwnd)?;
+
+        // BitBlt support only ClientOnly
+        let rect = Rect::get_window_rect(hwnd)?;
+
+        let hdc = CreatedHdc::create_compatible_dc(hdc_screen.hdc)?;
+        let hbmp = Hbitmap::create_compatible_bitmap(hdc_screen.hdc, rect.width, rect.height)?;
+
+        if SelectObject(hdc.hdc, hbmp.hbitmap).is_invalid() {
+            return Err(windows::core::Error::from_win32());
+        }
+
+        let flags = PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT);
+
+        if PrintWindow(hwnd, hdc.hdc, flags) == false {
+            return Err(windows::core::Error::from_win32());
+        }
+
+        let bmih = BITMAPINFOHEADER {
+            biSize: size_of::<BITMAPINFOHEADER>() as u32,
+            biPlanes: 1,
+            biBitCount: 32,
+            biWidth: rect.width,
+            biHeight: -rect.height,
+            biCompression: BI_RGB.0 as u32,
+            ..Default::default()
+        };
+        let mut bmi = BITMAPINFO {
+            bmiHeader: bmih,
+            ..Default::default()
+        };
+        buffer.reserve((4 * rect.width * rect.height) as usize);
+        let gdb = GetDIBits(
+            hdc.hdc,
+            hbmp.hbitmap,
+            0,
+            rect.height as u32,
+            Some(buffer.as_mut_ptr() as *mut core::ffi::c_void),
+            &mut bmi,
+            DIB_RGB_COLORS,
+        );
+        if gdb == 0 || gdb == ERROR_INVALID_PARAMETER.0 as i32 {
+            return Err(windows::core::Error::new(E_FAIL, "GetDIBits error".into()));
+        }
+        Ok(WindowSize {
+            width: rect.width as u32,
+            height: rect.height as u32,
+        })
+    }
 }
 pub fn capture_window_ex(
     hwnd: isize,
