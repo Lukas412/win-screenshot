@@ -1,5 +1,7 @@
 # win-screenshot
-Take a screenshot of a specific window or entire screen on Windows platform
+Take a screenshot of a specific window or entire screen on Windows platform.
+
+This is a fork of the original crate. The difference of the fork is the ability to take multiple screenshots, without allocating a new buffer every time.
 
 ## Known Issues
 `capture_window()` draws black border for some windows  
