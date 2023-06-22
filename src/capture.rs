@@ -64,6 +64,17 @@ pub fn capture_window_into_buffer(
     capture_window_into_buffer_ex(hwnd, buffer, Using::PrintWindow, Area::Full, None, None)
 }
 
+pub fn capture_window_into_buffer_bgr(
+    hwnd: isize,
+    buffer: &mut Vec<u8>,
+    using: Using,
+    area: Area,
+    crop_xy: Option<[i32; 2]>,
+    crop_wh: Option<[i32; 2]>,
+) -> Result<WindowSize, windows::core::Error> {
+    capture_window_into_bgr_buffer_ex(hwnd, buffer, Using::PrintWindow, Area::Full, None, None)
+}
+
 pub fn capture_window_ex(
     hwnd: isize,
     using: Using,
