@@ -42,13 +42,26 @@ pub enum Using {
 
 #[derive(Debug)]
 pub struct RgbBuf {
-    pub pixels: Vec<u8>, 
+    pub pixels: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug)]
+pub struct WindowSize {
     pub width: u32,
     pub height: u32,
 }
 
 pub fn capture_window(hwnd: isize) -> Result<RgbBuf, windows::core::Error> {
     capture_window_ex(hwnd, Using::PrintWindow, Area::Full, None, None)
+}
+
+pub fn capture_window_into_buffer(
+    hwnd: isize,
+    buffer: &mut Vec<u8>,
+) -> Result<WindowSize, windows::core::Error> {
+    capture_window_into_buffer_ex(hwnd, buffer, Using::PrintWindow, Area::Full, None, None)
 }
 
 pub fn capture_window_ex(
@@ -58,13 +71,33 @@ pub fn capture_window_ex(
     crop_xy: Option<[i32; 2]>,
     crop_wh: Option<[i32; 2]>,
 ) -> Result<RgbBuf, windows::core::Error> {
+    let mut buffer = vec![];
+    let WindowSize { width, height } =
+        capture_window_into_buffer_ex(hwnd, &mut buffer, using, area, crop_xy, crop_wh)?;
+    Ok(RgbBuf {
+        pixels: buffer,
+        width,
+        height,
+    })
+}
+
+pub fn capture_window_into_buffer_ex(
+    hwnd: isize,
+    buffer: &mut Vec<u8>,
+    using: Using,
+    area: Area,
+    crop_xy: Option<[i32; 2]>,
+    crop_wh: Option<[i32; 2]>,
+) -> Result<WindowSize, windows::core::Error> {
+    buffer.clear();
     let hwnd = HWND(hwnd);
 
     unsafe {
-        #[allow(unused_must_use)] {
+        #[allow(unused_must_use)]
+        {
             SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
         }
-        
+
         let hdc_screen = Hdc::get_dc(hwnd)?;
 
         // BitBlt support only ClientOnly
@@ -109,7 +142,7 @@ pub fn capture_window_ex(
             }
         }
 
-        let (w, h, hdc, hbmp) = match (crop, using) {
+        let (width, height, hdc, hbmp) = match (crop, using) {
             (true, Using::PrintWindow) => {
                 let hdc2 = CreatedHdc::create_compatible_dc(hdc.hdc)?;
                 let hbmp2 = Hbitmap::create_compatible_bitmap(hdc.hdc, cw, ch)?;
@@ -133,8 +166,8 @@ pub fn capture_window_ex(
             biSize: size_of::<BITMAPINFOHEADER>() as u32,
             biPlanes: 1,
             biBitCount: 32,
-            biWidth: w,
-            biHeight: -h,
+            biWidth: width,
+            biHeight: -height,
             biCompression: BI_RGB.0 as u32,
             ..Default::default()
         };
@@ -142,24 +175,23 @@ pub fn capture_window_ex(
             bmiHeader: bmih,
             ..Default::default()
         };
-        let mut buf: Vec<u8> = vec![0; (4 * w * h) as usize];
+        buffer.reserve((4 * width * height) as usize);
         let gdb = GetDIBits(
             hdc.hdc,
             hbmp.hbitmap,
             0,
-            h as u32,
-            Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
+            height as u32,
+            Some(buffer.as_mut_ptr() as *mut core::ffi::c_void),
             &mut bmi,
             DIB_RGB_COLORS,
         );
         if gdb == 0 || gdb == ERROR_INVALID_PARAMETER.0 as i32 {
             return Err(windows::core::Error::new(E_FAIL, "GetDIBits error".into()));
         }
-        buf.chunks_exact_mut(4).for_each(|c| c.swap(0, 2));
-        Ok(RgbBuf {
-            pixels: buf,
-            width: w as u32,
-            height: h as u32,
+        buffer.chunks_exact_mut(4).for_each(|c| c.swap(0, 2));
+        Ok(WindowSize {
+            width: width as u32,
+            height: height as u32,
         })
     }
 }
@@ -167,7 +199,8 @@ pub fn capture_window_ex(
 pub fn capture_display() -> Result<RgbBuf, WSError> {
     unsafe {
         // win 8.1 temporary DPI aware
-        #[allow(unused_must_use)] {
+        #[allow(unused_must_use)]
+        {
             SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
         }
         // for win 10
