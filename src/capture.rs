@@ -89,6 +89,19 @@ pub fn capture_window_into_buffer_ex(
     crop_xy: Option<[i32; 2]>,
     crop_wh: Option<[i32; 2]>,
 ) -> Result<WindowSize, windows::core::Error> {
+    let result = capture_window_into_bgr_buffer_ex(hwnd, buffer, using, area, crop_xy, crop_wh)?;
+    buffer.chunks_exact_mut(4).for_each(|c| c.swap(0, 2));
+    Ok(result)
+}
+
+pub fn capture_window_into_bgr_buffer_ex(
+    hwnd: isize,
+    buffer: &mut Vec<u8>,
+    using: Using,
+    area: Area,
+    crop_xy: Option<[i32; 2]>,
+    crop_wh: Option<[i32; 2]>,
+) -> Result<WindowSize, windows::core::Error> {
     buffer.clear();
     let hwnd = HWND(hwnd);
 
@@ -188,7 +201,6 @@ pub fn capture_window_into_buffer_ex(
         if gdb == 0 || gdb == ERROR_INVALID_PARAMETER.0 as i32 {
             return Err(windows::core::Error::new(E_FAIL, "GetDIBits error".into()));
         }
-        buffer.chunks_exact_mut(4).for_each(|c| c.swap(0, 2));
         Ok(WindowSize {
             width: width as u32,
             height: height as u32,
