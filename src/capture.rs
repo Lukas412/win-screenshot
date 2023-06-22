@@ -64,7 +64,7 @@ pub fn capture_window_into_buffer(
     capture_window_into_buffer_ex(hwnd, buffer, Using::PrintWindow, Area::Full, None, None)
 }
 
-pub fn capture_window_into_buffer_bgr(
+pub fn capture_window_into_bgr_buffer(
     hwnd: isize,
     buffer: &mut Vec<u8>,
     using: Using,
