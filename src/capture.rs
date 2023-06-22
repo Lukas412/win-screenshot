@@ -72,7 +72,7 @@ pub fn capture_window_into_bgr_buffer(
     let hwnd = HWND(hwnd);
 
     unsafe {
-        SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)?;
+        let _ = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 
         let hdc_screen = Hdc::get_dc(hwnd)?;
 
